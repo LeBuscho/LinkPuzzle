@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Puzzle-Botschaft</title>
+<style>
+  :root {
+    --bg: #f4efe4;
+    --ink: #2b241c;
+    --card: #fffdf8;
+    --line: #e4d8c4;
+    --accent: #e07a3d;
+    --accent-dark: #c45f24;
+    --ok: #2f7d4a;
+    --shadow: 0 10px 30px rgba(70, 48, 20, 0.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+    background:
+      radial-gradient(circle at top left, #ffe7c2 0, transparent 32%),
+      radial-gradient(circle at top right, #f7d7c4 0, transparent 28%),
+      var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+  header {
+    padding: 28px 20px 8px;
+    text-align: center;
+  }
+  header h1 {
+    margin: 0;
+    font-size: clamp(1.8rem, 4vw, 2.6rem);
+    letter-spacing: -0.03em;
+  }
+  header p { margin: 8px auto 0; max-width: 640px; color: #6d5d4b; }
+  main { max-width: 920px; margin: 0 auto; padding: 12px 16px 48px; }
+  .tabs { display: flex; gap: 8px; justify-content: center; margin: 18px 0; }
+  .tabs button, button, .copy {
+    border: 0;
+    border-radius: 999px;
+    padding: 10px 16px;
+    font: inherit;
+    cursor: pointer;
+  }
+  .tabs button { background: #efe4d2; color: var(--ink); }
+  .tabs button.active { background: var(--ink); color: #fff; }
+  button.primary { background: var(--accent); color: white; }
+  button.primary:hover { background: var(--accent-dark); }
+  button.ghost { background: #efe4d2; color: var(--ink); }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+    margin-bottom: 14px;
+  }
+  label { display: block; font-weight: 700; margin: 10px 0 6px; }
+  input, textarea, select {
+    width: 100%;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 14px;
+    padding: 12px;
+    font: inherit;
+    color: var(--ink);
+  }
+  textarea { min-height: 90px; resize: vertical; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .puzzle-item { border-top: 1px dashed var(--line); padding-top: 12px; margin-top: 12px; }
+  .hint { color: #6d5d4b; font-size: 0.92rem; }
+  .share {
+    word-break: break-all;
+    background: #fff7ea;
+    border-radius: 14px;
+    padding: 12px;
+    border: 1px dashed #e2c49a;
+  }
+  .tiles, .words { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .tile, .word {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 12px;
+    cursor: grab;
+    user-select: none;
+    box-shadow: 0 2px 0 #eadcc6;
+  }
+  .word.fixed { cursor: default; background: #eef8f0; border-color: #b7dfc2; }
+  .board {
+    display: grid;
+    gap: 6px;
+    margin: 14px auto;
+    width: min(100%, 420px);
+  }
+  .cell {
+    aspect-ratio: 1;
+    border-radius: 12px;
+    background: #fff7ea;
+    border: 1px solid var(--line);
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: clamp(0.85rem, 2vw, 1.1rem);
+    text-align: center;
+    padding: 4px;
+    cursor: pointer;
+  }
+  .cell.empty { background: transparent; border-style: dashed; cursor: default; }
+  .ok { color: var(--ok); font-weight: 800; }
+  .secret {
+    font-size: 1.35rem;
+    background: #eef8f0;
+    border-radius: 16px;
+    padding: 16px;
+    border: 1px solid #b7dfc2;
+  }
+  .hidden { display: none; }
+  footer { text-align: center; color: #8a7864; font-size: 0.85rem; padding-bottom: 24px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Puzzle-Botschaft</h1>
+  <p>Schreibe geheime Texte, verpacke sie in Rätsel und schicke deinem Freund einen Link. Erst wenn die Rätsel gelöst sind, erscheint der Text.</p>
+</header>
+<main>
+  <div class="tabs">
+    <button id="tab-create" class="active" type="button">Rätsel bauen</button>
+    <button id="tab-play" type="button">Rätsel lösen</button>
+  </div>
+
+  <section id="create">
+    <div class="card">
+      <label for="title">Titel der Botschaft</label>
+      <input id="title" maxlength="80" placeholder="Zum Beispiel: Für meinen Freund" />
+      <p class="hint">Du kannst mehrere Rätsel anlegen. Alle müssen gelöst werden, danach erscheint der ganze Text.</p>
+      <div id="list"></div>
+      <div class="row" style="margin-top:14px">
+        <button class="ghost" id="add" type="button">Weiteres Rätsel</button>
+        <button class="primary" id="make" type="button">Link erzeugen</button>
+      </div>
+    </div>
+    <div class="card hidden" id="share-box">
+      <strong>Dein Link</strong>
+      <p class="hint">Kopiere ihn und schicke ihn deinem Freund. Die Rätsel stecken im Link, es wird nichts auf einem Server gespeichert.</p>
+      <div class="share" id="share"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="primary copy" id="copy" type="button">Link kopieren</button>
+        <button class="ghost" id="open-play" type="button">Selbst ausprobieren</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="play" class="hidden"></section>
+</main>
+<footer>Nur für freundliche Nachrichten. Kein Konto nötig.</footer>
+<script>
+const $ = (id) => document.getElementById(id);
+const types = [
+  ["order", "Wörter in die richtige Reihenfolge bringen"],
+  ["scramble", "Buchstaben eines Wortes sortieren"],
+  ["slide", "Schiebepuzzle"]
+];
+
+function blankPuzzle() {
+  return { type: "order", text: "", hint: "" };
+}
+
+let puzzles = [blankPuzzle()];
+let shareUrl = "";
+
+function renderCreate() {
+  const list = $("list");
+  list.innerHTML = "";
+  puzzles.forEach((p, i) => {
+    const wrap = document.createElement("div");
+    wrap.className = "puzzle-item";
+    wrap.innerHTML = `
+      <div class="row">
+        <strong>Rätsel ${i + 1}</strong>
+        ${puzzles.length > 1 ? `<button class="ghost" data-del="${i}" type="button">Entfernen</button>` : ""}
+      </div>
+      <label>Art</label>
+      <select data-field="type" data-i="${i}">
+        ${types.map(([v, n]) => `<option value="${v}" ${p.type === v ? "selected" : ""}>${n}</option>`).join("")}
+      </select>
+      <label>Geheimer Text</label>
+      <textarea data-field="text" data-i="${i}" maxlength="180" placeholder="Dieser Text erscheint nach dem Lösen.">${escapeHtml(p.text)}</textarea>
+      <label>Tipp (optional)</label>
+      <input data-field="hint" data-i="${i}" maxlength="120" value="${escapeAttr(p.hint)}" placeholder="Zum Beispiel: Es ist ein Ort" />
+    `;
+    list.appendChild(wrap);
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>]/g, (c) => ({ "&": "&", "<": "<", ">": ">" }[c]));
+}
+function escapeAttr(s) {
+  return escapeHtml(s).replace(/"/g, """);
+}
+
+$("list").addEventListener("input", (e) => {
+  const t = e.target;
+  if (!t.dataset.field) return;
+  puzzles[+t.dataset.i][t.dataset.field] = t.value;
+});
+$("list").addEventListener("change", (e) => {
+  const t = e.target;
+  if (!t.dataset.field) return;
+  puzzles[+t.dataset.i][t.dataset.field] = t.value;
+});
+$("list").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-del]");
+  if (!btn) return;
+  puzzles.splice(+btn.dataset.del, 1);
+  renderCreate();
+});
+$("add").onclick = () => {
+  if (puzzles.length >= 8) return alert("Höchstens 8 Rätsel.");
+  puzzles.push(blankPuzzle());
+  renderCreate();
+};
+
+function cleanText(s) {
+  return s.replace(/\s+/g, " ").trim();
+}
+
+$("make").onclick = () => {
+  const title = cleanText($("title").value) || "Eine Puzzle-Botschaft";
+  const ready = puzzles.map((p) => ({
+    type: p.type,
+    text: cleanText(p.text),
+    hint: cleanText(p.hint)
+  })).filter((p) => p.text);
+  if (!ready.length) return alert("Schreibe mindestens einen geheimen Text.");
+  for (const p of ready) {
+    if (p.type === "scramble" && p.text.split(" ").length !== 1) {
+      return alert("Beim Buchstaben-Rätsel bitte nur ein Wort pro Rätsel.");
+    }
+    if (p.type === "order" && p.text.split(" ").length < 2) {
+      return alert("Beim Reihenfolge-Rätsel brauchst du mindestens zwei Wörter.");
+    }
+    if (p.type === "slide" && p.text.length < 2) {
+      return alert("Das Schiebepuzzle braucht etwas mehr Text.");
+    }
+  }
+  const data = btoa(unescape(encodeURIComponent(JSON.stringify({ title, puzzles: ready }))));
+  shareUrl = location.href.split("#")[0] + "#p=" + data;
+  $("share").textContent = shareUrl;
+  $("share-box").classList.remove("hidden");
+};
+
+$("copy").onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(shareUrl);
+    $("copy").textContent = "Kopiert";
+    setTimeout(() => { $("copy").textContent = "Link kopieren"; }, 1200);
+  } catch {
+    alert("Bitte den Link markieren und kopieren.");
+  }
+};
+$("open-play").onclick = () => { location.hash = shareUrl.split("#")[1]; showPlay(); };
+
+function showCreate() {
+  $("create").classList.remove("hidden");
+  $("play").classList.add("hidden");
+  $("tab-create").classList.add("active");
+  $("tab-play").classList.remove("active");
+}
+function showPlay() {
+  $("create").classList.add("hidden");
+  $("play").classList.remove("hidden");
+  $("tab-play").classList.add("active");
+  $("tab-create").classList.remove("active");
+  renderPlay();
+}
+$("tab-create").onclick = showCreate;
+$("tab-play").onclick = showPlay;
+
+function readPayload() {
+  const raw = location.hash.startsWith("#p=") ? location.hash.slice(3) : "";
+  if (!raw) return null;
+  try {
+    return JSON.parse(decodeURIComponent(escape(atob(raw))));
+  } catch {
+    return null;
+  }
+}
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function renderPlay() {
+  const box = $("play");
+  const payload = readPayload();
+  if (!payload) {
+    box.innerHTML = `<div class="card"><p>Noch kein Rätsel im Link. Baue zuerst eines und öffne den erzeugten Link.</p></div>`;
+    return;
+  }
+  const solved = payload.puzzles.map(() => false);
+  box.innerHTML = `<div class="card"><h2 style="margin-top:0">${escapeHtml(payload.title)}</h2><p class="hint">Löse alle Rätsel. Danach erscheint der geheime Text.</p><div id="puzzles"></div><div id="final"></div></div>`;
+  const host = document.getElementById("puzzles");
+  payload.puzzles.forEach((p, i) => host.appendChild(makePuzzle(p, i, () => {
+    solved[i] = true;
+    if (solved.every(Boolean)) {
+      document.getElementById("final").innerHTML = `<p class="ok">Geschafft!</p>` + payload.puzzles.map((item) => `<div class="secret">${escapeHtml(item.text)}</div>`).join("");
+    }
+  })));
+}
+
+function makePuzzle(p, index, onSolve) {
+  const card = document.createElement("div");
+  card.className = "card";
+  const hint = p.hint ? `<p class="hint">Tipp: ${escapeHtml(p.hint)}</p>` : "";
+  card.innerHTML = `<strong>Rätsel ${index + 1}</strong>${hint}<div class="zone"></div><p class="status hint"></p>`;
+  const zone = card.querySelector(".zone");
+  const status = card.querySelector(".status");
+  if (p.type === "order") mountOrder(zone, status, p.text, onSolve);
+  else if (p.type === "scramble") mountScramble(zone, status, p.text, onSolve);
+  else mountSlide(zone, status, p.text, onSolve);
+  return card;
+}
+
+function mountOrder(zone, status, text, onSolve) {
+  const words = text.split(" ");
+  let current = shuffle(words);
+  if (current.join(" ") === text) current = current.reverse();
+  const draw = () => {
+    zone.innerHTML = `<p>Ziehe die Wörter in die richtige Reihenfolge.</p>`;
+    const row = document.createElement("div");
+    row.className = "words";
+    current.forEach((w, i) => {
+      const el = document.createElement("div");
+      el.className = "word";
+      el.draggable = true;
+      el.textContent = w;
+      el.addEventListener("dragstart", () => el.dataset.drag = "1");
+      el.addEventListener("dragover", (e) => e.preventDefault());
+      el.addEventListener("drop", () => {
+        const from = current.findIndex((_, idx) => row.children[idx].dataset.drag === "1");
+        row.querySelectorAll(".word").forEach((n) => delete n.dataset.drag);
+        if (from < 0 || from === i) return;
+        const [item] = current.splice(from, 1);
+        current.splice(i, 0, item);
+        draw();
+      });
+      row.appendChild(el);
+    });
+    zone.appendChild(row);
+    const btn = document.createElement("button");
+    btn.className = "primary";
+    btn.type = "button";
+    btn.textContent = "Prüfen";
+    btn.onclick = () => {
+      if (current.join(" ") === text) {
+        status.innerHTML = `<span class="ok">Richtig!</span>`;
+        onSolve();
+        btn.disabled = true;
+      } else status.textContent = "Noch nicht richtig. Versuch es noch einmal.";
+    };
+    zone.appendChild(btn);
+  };
+  draw();
+}
+
+function mountScramble(zone, status, text, onSolve) {
+  const letters = text.split("");
+  let current = shuffle(letters);
+  if (current.join("") === text) current = current.reverse();
+  const draw = () => {
+    zone.innerHTML = `<p>Bringe die Buchstaben in die richtige Reihenfolge.</p>`;
+    const row = document.createElement("div");
+    row.className = "words";
+    current.forEach((ch, i) => {
+      const el = document.createElement("div");
+      el.className = "word";
+      el.draggable = true;
+      el.textContent = ch;
+      el.addEventListener("dragstart", () => el.dataset.drag = "1");
+      el.addEventListener("dragover", (e) => e.preventDefault());
+      el.addEventListener("drop", () => {
+        const from = [...row.children].findIndex((n) => n.dataset.drag === "1");
+        row.querySelectorAll(".word").forEach((n) => delete n.dataset.drag);
+        if (from < 0 || from === i) return;
+        const [item] = current.splice(from, 1);
+        current.splice(i, 0, item);
+        draw();
+      });
+      row.appendChild(el);
+    });
+    zone.appendChild(row);
+    const btn = document.createElement("button");
+    btn.className = "primary";
+    btn.type = "button";
+    btn.textContent = "Prüfen";
+    btn.onclick = () => {
+      if (current.join("") === text) {
+        status.innerHTML = `<span class="ok">Richtig!</span>`;
+        onSolve();
+        btn.disabled = true;
+      } else status.textContent = "Noch nicht richtig.";
+    };
+    zone.appendChild(btn);
+  };
+  draw();
+}
+
+function mountSlide(zone, status, text, onSolve) {
+  const chunks = text.match(/.{1,4}/g) || [text];
+  const size = chunks.length <= 4 ? 2 : 3;
+  const count = size * size;
+  while (chunks.length < count - 1) chunks.push("");
+  const tiles = chunks.slice(0, count - 1).concat([null]);
+  let board = shuffle(tiles);
+  const solved = () => board.slice(0, -1).every((t, i) => t === chunks[i]) && board[count - 1] === null;
+  if (solved()) board = board.reverse();
+  const draw = () => {
+    zone.innerHTML = `<p>Schiebe die Teile, bis der Text stimmt. Leeres Feld antippen neben einem Teil.</p>`;
+    const grid = document.createElement("div");
+    grid.className = "board";
+    grid.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+    board.forEach((tile, i) => {
+      const cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "cell" + (tile == null ? " empty" : "");
+      cell.textContent = tile || "";
+      cell.onclick = () => {
+        const empty = board.indexOf(null);
+        const row = Math.floor(i / size), col = i % size;
+        const er = Math.floor(empty / size), ec = empty % size;
+        if (Math.abs(row - er) + Math.abs(col - ec) === 1) {
+          [board[i], board[empty]] = [board[empty], board[i]];
+          draw();
+          if (solved()) {
+            status.innerHTML = `<span class="ok">Richtig!</span>`;
+            onSolve();
+          }
+        }
+      };
+      grid.appendChild(cell);
+    });
+    zone.appendChild(grid);
+  };
+  draw();
+}
+
+renderCreate();
+if (location.hash.startsWith("#p=")) showPlay();
+window.addEventListener("hashchange", () => {
+  if (location.hash.startsWith("#p=")) showPlay();
+});
+</script>
+</body>
+</html>
